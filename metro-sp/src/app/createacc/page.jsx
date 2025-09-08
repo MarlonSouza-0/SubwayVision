@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FaUser, FaLock } from "react-icons/fa";
+import { IoEye, IoEyeOff } from "react-icons/io5";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/firebase/config.js";
@@ -13,6 +14,8 @@ const Register = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -34,7 +37,6 @@ const Register = () => {
     setLoading(true);
 
     try {
-      // 🔹 Cria usuário no Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         username,
@@ -43,7 +45,6 @@ const Register = () => {
 
       const user = userCredential.user;
 
-      // 🔹 Salva dados no Firestore com UID fixo
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         name,
@@ -52,10 +53,10 @@ const Register = () => {
       });
 
       console.log("✅ Usuário registrado e salvo no Firestore!");
-      router.push("/dashboard"); // Redireciona após cadastro
+      router.push("/dashboard");
     } catch (err) {
       console.error("Erro ao registrar:", err);
-      setError("Erro ao registrar: " + err.message);
+      setError("Erro ao registrar usuário.");
     } finally {
       setLoading(false);
     }
@@ -80,57 +81,65 @@ const Register = () => {
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full h-12 pl-4 pr-12 bg-transparent border border-white/30 rounded-full text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full h-12 pl-12 pr-4 bg-transparent border border-white/30 rounded-full text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-            <FaUser className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-lg" />
+            <FaUser className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg" />
           </div>
 
           {/* Email */}
-          <div className="relative flex flex-col gap-1">
-            <div className="relative">
-              <input
-                type="email"
-                placeholder="E-mail"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className={`w-full h-12 pl-4 pr-12 bg-transparent border ${
-                  error
-                    ? "border-red-500 focus:ring-red-400"
-                    : "border-white/30 focus:ring-blue-400"
-                } rounded-full text-white placeholder-white focus:outline-none focus:ring-2`}
-              />
-              <FaUser className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-lg" />
-            </div>
+          <div className="relative">
+            <input
+              type="email"
+              placeholder="E-mail"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full h-12 pl-12 pr-4 bg-transparent border border-white/30 rounded-full text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <FaUser className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg" />
           </div>
 
           {/* Senha */}
           <div className="relative">
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="Senha"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-12 pl-4 pr-12 bg-transparent border border-white/30 rounded-full text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full h-12 pl-12 pr-12 bg-transparent border border-white/30 rounded-full text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-            <FaLock className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-lg" />
+            <FaLock className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg" />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-lg"
+            >
+              {showPassword ? <IoEyeOff /> : <IoEye />}
+            </button>
           </div>
 
           {/* Confirmar Senha */}
           <div className="relative">
             <input
-              type="password"
+              type={showConfirmPassword ? "text" : "password"}
               placeholder="Confirmar Senha"
               required
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full h-12 pl-4 pr-12 bg-transparent border border-white/30 rounded-full text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full h-12 pl-12 pr-12 bg-transparent border border-white/30 rounded-full text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
-            <FaLock className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-lg" />
+            <FaLock className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg" />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-lg"
+            >
+              {showConfirmPassword ? <IoEyeOff /> : <IoEye />}
+            </button>
           </div>
 
-          {/* Mensagens */}
+          {/* Mensagem de erro */}
           {error && <p className="text-red-400 text-sm">{error}</p>}
 
           {/* Botão */}
@@ -142,7 +151,6 @@ const Register = () => {
             {loading ? "Registrando..." : "Registrar"}
           </button>
 
-          {/* Link para Login */}
           <p className="text-sm text-center text-white">
             Já tem uma conta?{" "}
             <Link href="/" className="font-semibold hover:underline">

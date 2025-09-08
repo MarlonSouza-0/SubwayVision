@@ -2,26 +2,48 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth } from "@/firebase/config.js";
-import { signOut } from "firebase/auth";
+import { auth, db } from "@/firebase/config.js";
+import { signOut, onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
-    // 🔹 Carrega dados do usuário
-    const storedUser = localStorage.getItem("user");
+    // 🔹 Tenta carregar do localStorage ou sessionStorage
+    const storedUser =
+      localStorage.getItem("user") || sessionStorage.getItem("user");
+
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     } else {
-      router.push("/"); // se não estiver logado, volta pro login
+      // 🔹 Se não achar no storage, consulta o Firebase Auth
+      const unsub = onAuthStateChanged(auth, async (fbUser) => {
+        if (fbUser) {
+          const snap = await getDoc(doc(db, "users", fbUser.uid));
+          if (snap.exists()) {
+            const data = snap.data();
+            setUser(data);
+
+            // 🔹 Garante que pelo menos fique na sessão
+            sessionStorage.setItem("user", JSON.stringify(data));
+          } else {
+            router.push("/");
+          }
+        } else {
+          router.push("/"); // não logado
+        }
+      });
+
+      return () => unsub();
     }
   }, [router]);
 
   const handleLogout = async () => {
     await signOut(auth);
     localStorage.removeItem("user");
+    sessionStorage.removeItem("user");
     router.push("/");
   };
 
