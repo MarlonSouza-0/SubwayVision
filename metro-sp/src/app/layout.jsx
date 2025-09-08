@@ -1,9 +1,15 @@
 import "./globals.css";
 
+
 export const metadata = {
-  title: "Meu App",
-  description: "Aplicação Next.js com Tailwind",
+  title: "Metro-SP",
+  description: "Sistema de login",
+  icons: {
+    icon: "assets/icon.png", // caminho relativo à pasta public
+  },
 };
+
+
 
 export default function RootLayout({ children }) {
   return (
@@ -12,3 +18,5 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
+
+
