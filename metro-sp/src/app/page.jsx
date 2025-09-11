@@ -5,7 +5,7 @@ import { FaUser, FaLock } from "react-icons/fa";
 import { IoEye, IoEyeOff } from "react-icons/io5";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/firebase/config.js";
+import { auth, db } from "@/lib/firebase/config.js";
 import {
   signInWithEmailAndPassword,
   setPersistence,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/firebase/config";
+import { auth, db } from "@/lib/firebase/config.js";
 import { signOut } from "firebase/auth";
 import {
   Home,
@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 
-import ImageUploader from "@/components/upload/ImageUploader";
-import ImageGallery from "@/components/upload/ImageGallery";
+import ImageUploader from "@/features/upload/components/ImageUploader";
+import ImageGallery from "@/features/upload/components/ImageGallery";
 
 export default function DashboardComponent() {
   const [user, setUser] = useState(null);

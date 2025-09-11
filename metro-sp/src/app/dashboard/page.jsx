@@ -1,7 +1,7 @@
-"use client";
 
-import DashboardComponent from "@/components/DashboardComponent";
 
-export default function DashboardPage() {
+import DashboardComponent from "@/features/dashboard/components/DashboardComponent.jsx";
+
+export default function Dashboard() {
   return <DashboardComponent />;
 }
