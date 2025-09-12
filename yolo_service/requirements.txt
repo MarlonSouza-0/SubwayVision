@@ -1,0 +1,8 @@
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.11.7
+requests==2.32.3
+pillow==10.4.0
+ultralytics==8.2.47
+torch==2.8.0
+torchvision==0.23.0

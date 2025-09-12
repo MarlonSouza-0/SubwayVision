@@ -1,95 +1,125 @@
 "use client";
 
 import { useState } from "react";
-import { db, storage } from "@/lib/firebase/config";
+import { auth, db, storage } from "@/lib/firebase/config";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "@/shared/context/AuthContext";
 
 export default function ImageUploader() {
-  const [uploading, setUploading] = useState(false);
+  const { user } = useAuth();
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  // Upload function
-  const handleUpload = async (file) => {
-    if (!file) return;
+  const handleFileChange = (e) => {
+    const selected = e.target.files[0];
+    if (selected && selected.type.startsWith("image/")) {
+      setFile(selected);
+      setPreview(URL.createObjectURL(selected));
+      setError("");
+      setSuccess("");
+    } else {
+      setError("Por favor, selecione uma imagem válida.");
+    }
+  };
 
-    setUploading(true);
+  const handleUpload = () => {
+    if (!file) {
+      setError("Selecione uma imagem antes de enviar.");
+      return;
+    }
+    if (!user) {
+      setError("Você precisa estar logado para enviar imagens.");
+      return;
+    }
 
-    const storageRef = ref(storage, `images/${file.name}-${Date.now()}`);
+    setError("");
+    setSuccess("");
+    setProgress(0);
+
+    // Caminho no Firebase Storage
+    const storageRef = ref(storage, `uploads/${user.uid}/${Date.now()}-${file.name}`);
+
     const uploadTask = uploadBytesResumable(storageRef, file);
 
     uploadTask.on(
       "state_changed",
       (snapshot) => {
-        const prog = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        setProgress(prog);
+        const pct = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        setProgress(pct);
       },
-      (error) => {
-        console.error(error);
-        setUploading(false);
+      (err) => {
+        console.error("Erro no upload:", err);
+        setError("Erro ao enviar a imagem.");
       },
       async () => {
+        // Upload concluído → pega URL
         const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-        await addDoc(collection(db, "images"), {
+
+        // Salva metadados no Firestore
+        await addDoc(collection(db, "uploads"), {
+          userId: user.uid,
           url: downloadURL,
+          fileName: file.name,
           createdAt: serverTimestamp(),
         });
-        setUploading(false);
+
+        setSuccess("✅ Upload concluído com sucesso!");
+        setFile(null);
+        setPreview(null);
         setProgress(0);
       }
     );
   };
 
-  // Handler for input
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    handleUpload(file);
-  };
-
-  // Handler for drag & drop
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    handleUpload(file);
-  };
-
   return (
-    <div className="p-6 bg-gray-800 rounded-2xl shadow-md text-center text-white">
-      <h2 className="text-xl font-semibold mb-4">Upload de Imagem</h2>
+    <div className="bg-gray-800 p-6 rounded-2xl shadow-md text-white">
+      <h2 className="text-xl font-semibold mb-4">📤 Enviar imagem</h2>
 
-      {/* Área de drag & drop */}
-      <div
-        onDrop={handleDrop}
-        onDragOver={(e) => e.preventDefault()}
-        className="border-2 border-dashed border-gray-500 rounded-xl p-8 cursor-pointer hover:border-blue-400 transition"
-      >
-        <p className="mb-2">Arraste sua imagem aqui</p>
-        <p className="text-sm text-gray-400">ou</p>
+      {/* Input de arquivo */}
+      <input
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="mb-4"
+      />
 
-        {/* Botão de upload */}
-        <label className="mt-3 inline-block bg-blue-600 px-4 py-2 rounded-lg cursor-pointer hover:bg-blue-500 transition">
-          Escolher arquivo
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
+      {/* Preview */}
+      {preview && (
+        <div className="mb-4">
+          <img
+            src={preview}
+            alt="Preview"
+            className="max-h-64 rounded-lg shadow-md object-contain"
           />
-        </label>
-      </div>
-
-      {/* Progresso */}
-      {uploading && (
-        <div className="mt-4">
-          <p>Enviando: {Math.round(progress)}%</p>
-          <div className="w-full bg-gray-600 rounded-full h-2 mt-2">
-            <div
-              className="bg-blue-500 h-2 rounded-full"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
         </div>
       )}
+
+      {/* Barra de progresso */}
+      {progress > 0 && (
+        <div className="w-full bg-gray-700 rounded-full h-2 mb-4">
+          <div
+            className="bg-blue-600 h-2 rounded-full"
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+      )}
+
+      {/* Mensagens */}
+      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {success && <p className="text-green-400 text-sm">{success}</p>}
+
+      {/* Botão */}
+      <button
+        onClick={handleUpload}
+        disabled={!file || !user}
+        className="mt-4 w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition disabled:opacity-50"
+      >
+        {file ? "Enviar imagem" : "Selecione um arquivo"}
+      </button>
     </div>
   );
 }

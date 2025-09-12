@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase/config.js";
-import { signOut } from "firebase/auth";
+import { db } from "@/lib/firebase/config.js";
+import { useAuth } from "@/shared/context/AuthContext";
 import {
   Home,
   Upload,
@@ -12,29 +12,28 @@ import {
   Settings,
   LogOut,
 } from "lucide-react";
-import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
+import {
+  collection,
+  query,
+  orderBy,
+  limit,
+  getDocs,
+} from "firebase/firestore";
 
 import ImageUploader from "@/features/upload/components/ImageUploader";
 import ImageGallery from "@/features/upload/components/ImageGallery";
+import UpdateName from "@/features/settings/components/UpdateName";
+import UpdatePassword from "@/features/settings/components/UpdatePassword";
+
 
 export default function DashboardComponent() {
-  const [user, setUser] = useState(null);
+  const { user, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState("home");
   const [lastUpload, setLastUpload] = useState(null);
   const router = useRouter();
 
+  // 🔎 Buscar último upload
   useEffect(() => {
-    const storedUser =
-      localStorage.getItem("user") || sessionStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    } else {
-      router.push("/");
-    }
-  }, [router]);
-
-  useEffect(() => {
-    // 🔎 Pegar último upload no Firestore
     const fetchLastUpload = async () => {
       try {
         const q = query(
@@ -54,15 +53,14 @@ export default function DashboardComponent() {
     fetchLastUpload();
   }, [activeTab]);
 
+  // 🔒 Logout
   const handleLogout = async () => {
-    await signOut(auth);
-    localStorage.removeItem("user");
-    sessionStorage.removeItem("user");
-    router.push("/");
+    await signOut();
+    router.replace("/");
   };
 
   if (!user) {
-    return <p className="text-white text-center">Carregando...</p>;
+    return <p className="text-white text-center">Carregando usuário...</p>;
   }
 
   return (
@@ -126,9 +124,12 @@ export default function DashboardComponent() {
 
       {/* Conteúdo Principal */}
       <main className="flex-1 p-8 overflow-y-auto">
+        {/* Aba Home */}
         {activeTab === "home" && (
           <div>
-            <h1 className="text-3xl font-bold">Bem-vindo, {user.name}!</h1>
+            <h1 className="text-3xl font-bold">
+              Bem-vindo, {user.displayName || "Usuário"}!
+            </h1>
             <p className="text-gray-400 mt-2">
               Aqui você pode gerenciar imagens, relatórios e acompanhar a obra.
             </p>
@@ -158,10 +159,13 @@ export default function DashboardComponent() {
           </div>
         )}
 
+        {/* Aba Upload */}
         {activeTab === "upload" && <ImageUploader />}
 
+        {/* Aba Galeria */}
         {activeTab === "gallery" && <ImageGallery />}
 
+        {/* Aba Relatórios */}
         {activeTab === "reports" && (
           <div className="p-6 bg-gray-800 rounded-2xl shadow-md">
             <h2 className="text-xl font-semibold mb-4">📊 Relatórios</h2>
@@ -171,12 +175,12 @@ export default function DashboardComponent() {
           </div>
         )}
 
+        {/* Aba Configurações */}
         {activeTab === "settings" && (
-          <div className="p-6 bg-gray-800 rounded-2xl shadow-md">
+          <div className="p-6 bg-gray-800 rounded-2xl shadow-md max-w-md">
             <h2 className="text-xl font-semibold mb-4">⚙️ Configurações</h2>
-            <p className="text-gray-400">
-              Em breve: configurações de conta e preferências.
-            </p>
+            <UpdateName /> {/* 🚀 componente separado */}
+            <UpdatePassword /> {/* 🚀 componente separado */}
           </div>
         )}
       </main>

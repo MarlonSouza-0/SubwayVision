@@ -1,6 +1,6 @@
-// src/lib/firebase.js
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+// src/lib/firebase/config.js
+import { initializeApp, getApps } from "firebase/app";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -13,10 +13,21 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
-// Inicializa Firebase apenas uma vez
-const app = initializeApp(firebaseConfig);
+// const auth = getAuth(app);
+// // Persistência local (tab do navegador)
+// setPersistence(auth, browserLocalPersistence);
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence); // 🔒 sempre lembrar login
+
+
+
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+export { app, auth, db, storage };
+
+
+

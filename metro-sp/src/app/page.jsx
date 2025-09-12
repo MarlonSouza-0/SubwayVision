@@ -1,32 +1,27 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/shared/context/AuthContext";
 import { FaUser, FaLock } from "react-icons/fa";
 import { IoEye, IoEyeOff } from "react-icons/io5";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase/config.js";
-import {
-  signInWithEmailAndPassword,
-  setPersistence,
-  browserLocalPersistence,
-  browserSessionPersistence,
-} from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 
-const Login = () => {
-  const [username, setUsername] = useState("");
+export default function Login() {
+  const { signIn } = useAuth();
+  const router = useRouter();
+
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false); // opcional, pode remover depois
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!username.endsWith("@metrosp.com")) {
+    if (!email.endsWith("@metrosp.com")) {
       setError("O e-mail precisa terminar com @metrosp.com");
       return;
     }
@@ -35,40 +30,19 @@ const Login = () => {
     setLoading(true);
 
     try {
-      // 🔒 Define persistência do Firebase Auth
-      await setPersistence(
-        auth,
-        rememberMe ? browserLocalPersistence : browserSessionPersistence
-      );
-
-      // 🔐 Faz login
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        username,
-        password
-      );
-      const user = userCredential.user;
-
-      // 🔎 Busca dados no Firestore
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        setError("Usuário não encontrado no banco.");
-        return;
-      }
-
-      const userData = userSnap.data();
-      console.log("Usuário logado:", userData);
-
-      // 💾 Guarda dados p/ Dashboard
-      const storage = rememberMe ? localStorage : sessionStorage;
-      storage.setItem("user", JSON.stringify(userData));
-
-      router.push("/dashboard");
+      await signIn(email, password); // 🚀 usa AuthContext
+      router.push("/dashboard");     // ✅ redireciona só depois de logar
     } catch (err) {
       console.error("Erro no login:", err);
-      setError("E-mail ou senha inválidos.");
+      if (err.code === "auth/user-not-found") {
+        setError("Usuário não encontrado.");
+      } else if (err.code === "auth/wrong-password") {
+        setError("Senha incorreta.");
+      } else if (err.code === "auth/invalid-email") {
+        setError("E-mail inválido.");
+      } else {
+        setError("Erro ao efetuar login.");
+      }
     } finally {
       setLoading(false);
     }
@@ -85,24 +59,22 @@ const Login = () => {
             Acesse o sistema
           </h1>
 
-          {/* Input Usuário */}
+          {/* E-mail */}
           <div className="relative">
             <input
               type="email"
               placeholder="E-mail"
               required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className={`w-full h-12 pl-4 pr-12 bg-transparent border ${
-                error
-                  ? "border-red-500 focus:ring-red-400"
-                  : "border-white/30 focus:ring-blue-400"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={`w-full h-12 pl-12 pr-4 bg-transparent border ${
+                error ? "border-red-500 focus:ring-red-400" : "border-white/30 focus:ring-blue-400"
               } rounded-full text-white placeholder-white focus:outline-none focus:ring-2`}
             />
-            <FaUser className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-lg" />
+            <FaUser className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg" />
           </div>
 
-          {/* Input Senha */}
+          {/* Senha */}
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
@@ -110,16 +82,16 @@ const Login = () => {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-12 pl-4 pr-12 bg-transparent border border-white/30 rounded-full text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-full h-12 pl-12 pr-12 bg-transparent border border-white/30 rounded-full text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
+            <FaLock className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg" />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-10 top-1/2 -translate-y-1/2 text-white text-lg"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-lg"
             >
               {showPassword ? <IoEyeOff /> : <IoEye />}
             </button>
-            <FaLock className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-lg" />
           </div>
 
           {/* Lembre de mim + Esqueceu senha */}
@@ -133,15 +105,15 @@ const Login = () => {
               />
               Lembre de mim
             </label>
-            <Link href="/forgot-password" className="hover:underline">
+            <Link href="/auth/forgot-password" className="hover:underline">
               Esqueceu sua senha?
             </Link>
           </div>
 
-          {/* Mensagem de erro */}
+          {/* Erro */}
           {error && <p className="text-red-400 text-sm">{error}</p>}
 
-          {/* Botão */}
+          {/* Botão login */}
           <button
             type="submit"
             disabled={loading}
@@ -153,7 +125,7 @@ const Login = () => {
           {/* Registro */}
           <p className="text-sm text-center text-white">
             Não tem uma conta?{" "}
-            <Link href="/createacc" className="font-semibold hover:underline">
+            <Link href="/auth/create-account" className="font-semibold hover:underline">
               Registre-se
             </Link>
           </p>
@@ -161,6 +133,4 @@ const Login = () => {
       </div>
     </div>
   );
-};
-
-export default Login;
+}

@@ -6,12 +6,12 @@ import { IoEye, IoEyeOff } from "react-icons/io5";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase/config.js";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
-const Register = () => {
+export default function CreateAccountPage() {
   const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -23,11 +23,11 @@ const Register = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!username.endsWith("@metrosp.com")) {
+    // validações básicas
+    if (!email.endsWith("@metrosp.com")) {
       setError("O e-mail precisa terminar com @metrosp.com");
       return;
     }
-
     if (password !== confirmPassword) {
       setError("As senhas não coincidem");
       return;
@@ -37,26 +37,38 @@ const Register = () => {
     setLoading(true);
 
     try {
+      // cria usuário no Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        username,
+        email,
         password
       );
-
       const user = userCredential.user;
 
+      // garante que o nome vai pro perfil do Firebase
+      await updateProfile(user, { displayName: name });
+
+      // salva também no Firestore (redundância útil p/ buscar depois)
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
-        name,
-        email: username,
+        name, // 👈 salva nome
+        email,
         createdAt: serverTimestamp(),
       });
 
-      console.log("✅ Usuário registrado e salvo no Firestore!");
+      console.log("✅ Conta criada:", user);
+
+      // redireciona para o dashboard
       router.push("/dashboard");
     } catch (err) {
       console.error("Erro ao registrar:", err);
-      setError("Erro ao registrar usuário.");
+      if (err.code === "auth/email-already-in-use") {
+        setError("Este e-mail já está em uso.");
+      } else if (err.code === "auth/weak-password") {
+        setError("A senha deve ter pelo menos 6 caracteres.");
+      } else {
+        setError("Erro ao registrar usuário.");
+      }
     } finally {
       setLoading(false);
     }
@@ -92,8 +104,8 @@ const Register = () => {
               type="email"
               placeholder="E-mail"
               required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full h-12 pl-12 pr-4 bg-transparent border border-white/30 rounded-full text-white placeholder-white focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
             <FaUser className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-lg" />
@@ -161,6 +173,4 @@ const Register = () => {
       </div>
     </div>
   );
-};
-
-export default Register;
+}

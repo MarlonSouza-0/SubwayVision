@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase/config.js";
+import { db } from "@/lib/firebase/config";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { X } from "lucide-react";
 
-const ImageGallery = () => {
+export default function ImageGallery() {
   const [images, setImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
     const q = query(
-      collection(db, "images"),
-      orderBy("createdAt", "desc") // mais recentes primeiro
+      collection(db, "uploads"), // 🔄 alinhado com ImageUploader
+      orderBy("createdAt", "desc")
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -42,14 +42,17 @@ const ImageGallery = () => {
             >
               <img
                 src={img.url}
-                alt="Upload"
+                alt={img.fileName || "Upload"}
                 className="w-full h-40 object-cover rounded-lg"
               />
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
                 <p className="text-sm text-white text-center px-2">
                   {img.userName || "Usuário"} <br />
+                  {img.fileName || "Arquivo"} <br />
                   {img.createdAt?.seconds
-                    ? new Date(img.createdAt.seconds * 1000).toLocaleString()
+                    ? new Date(img.createdAt.seconds * 1000).toLocaleString(
+                        "pt-BR"
+                      )
                     : "Data não disponível"}
                 </p>
               </div>
@@ -70,15 +73,16 @@ const ImageGallery = () => {
             </button>
             <img
               src={selectedImage.url}
-              alt="Selecionada"
+              alt={selectedImage.fileName || "Selecionada"}
               className="w-full max-h-[80vh] object-contain rounded-lg"
             />
             <p className="text-gray-300 mt-2 text-center">
               {selectedImage.userName || "Usuário"} -{" "}
+              {selectedImage.fileName || "Arquivo"} -{" "}
               {selectedImage.createdAt?.seconds
                 ? new Date(
                     selectedImage.createdAt.seconds * 1000
-                  ).toLocaleString()
+                  ).toLocaleString("pt-BR")
                 : "Data não disponível"}
             </p>
           </div>
@@ -86,6 +90,4 @@ const ImageGallery = () => {
       )}
     </div>
   );
-};
-
-export default ImageGallery;
+}
