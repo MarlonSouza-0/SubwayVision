@@ -1,19 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { auth, db, storage } from "@/lib/firebase/config";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { db } from "@/lib/firebase/config";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/shared/context/AuthContext";
 
 export default function ImageUploader() {
   const { user } = useAuth();
-  const [file, setFile] = useState(null);
+
+  const [file, setFile] = useState(null);        // imagem
+  const [ifcFile, setIfcFile] = useState(null);  // IFC
   const [preview, setPreview] = useState(null);
-  const [progress, setProgress] = useState(0);
+
+  const [colunaId, setColunaId] = useState("");
+  const [localObra, setLocalObra] = useState("");
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
+  // ============ handlers ============
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
     if (selected && selected.type.startsWith("image/")) {
@@ -26,68 +32,122 @@ export default function ImageUploader() {
     }
   };
 
-  const handleUpload = () => {
+  const handleIfcChange = (e) => {
+    const selected = e.target.files[0];
+    if (selected && selected.name.toLowerCase().endsWith(".ifc")) {
+      setIfcFile(selected);
+      setError("");
+    } else {
+      setError("Por favor, selecione um arquivo IFC válido (.ifc).");
+    }
+  };
+
+  // ============ fluxo principal ============
+  const handleUpload = async () => {
     if (!file) {
       setError("Selecione uma imagem antes de enviar.");
       return;
     }
+    if (!ifcFile) {
+      setError("Selecione um arquivo IFC antes de enviar.");
+      return;
+    }
     if (!user) {
-      setError("Você precisa estar logado para enviar imagens.");
+      setError("Você precisa estar logado para enviar arquivos.");
       return;
     }
 
     setError("");
     setSuccess("");
-    setProgress(0);
+    setLoadingAnalysis(true);
 
-    // Caminho no Firebase Storage
-    const storageRef = ref(storage, `uploads/${user.uid}/${Date.now()}-${file.name}`);
+    try {
+      console.log("[UPLOAD] Iniciando fluxo...");
 
-    const uploadTask = uploadBytesResumable(storageRef, file);
+      // 1) Envio para o backend FastAPI
+      const formData = new FormData();
+      formData.append("imagem", file);
+      formData.append("ifc_file", ifcFile);
+      formData.append("coluna_id", colunaId);
+      formData.append("local", localObra);
 
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        const pct = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        setProgress(pct);
-      },
-      (err) => {
-        console.error("Erro no upload:", err);
-        setError("Erro ao enviar a imagem.");
-      },
-      async () => {
-        // Upload concluído → pega URL
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+      console.log("[UPLOAD] Enviando para FastAPI /analisar-coluna-ifc ...");
 
-        // Salva metadados no Firestore
-        await addDoc(collection(db, "uploads"), {
-          userId: user.uid,
-          url: downloadURL,
-          fileName: file.name,
-          createdAt: serverTimestamp(),
-        });
+      const response = await fetch("http://127.0.0.1:8000/analisar-coluna-ifc", {
+        method: "POST",
+        body: formData,
+      });
 
-        setSuccess("✅ Upload concluído com sucesso!");
-        setFile(null);
-        setPreview(null);
-        setProgress(0);
+      console.log("[UPLOAD] Status da API:", response.status);
+
+      if (!response.ok) {
+        const txt = await response.text();
+        console.error("[UPLOAD] Erro FastAPI:", txt);
+        setError("Erro ao analisar no backend. Veja o console.");
+        setLoadingAnalysis(false);
+        return;
       }
-    );
+
+      const relatorio = await response.json();
+      console.log("[UPLOAD] Relatório recebido:", relatorio);
+
+      // pega URL da imagem gerada/salva pelo backend
+      const imageUrl =
+        relatorio.image_url ||
+        relatorio.caminho_arquivo_imagem ||
+        ""; // fallback simples
+
+      if (!imageUrl) {
+        console.warn(
+          "[UPLOAD] Backend não retornou image_url, a galeria pode não exibir a imagem."
+        );
+      }
+
+      // 2) Salvar na coleção uploads (usada pela Galeria)
+      await addDoc(collection(db, "uploads"), {
+        userId: user.uid,
+        url: imageUrl,
+        fileName: file.name,
+        createdAt: serverTimestamp(),
+      });
+
+      // 3) Salvar relatório completo na coleção reports
+      await addDoc(collection(db, "reports"), {
+        userId: user.uid,
+        imageUrl,
+        fileName: file.name,
+        colunaId,
+        localObra,
+        relatorioCompleto: relatorio,
+        createdAt: serverTimestamp(),
+      });
+
+      setSuccess("✅ Análise concluída e relatório registrado com sucesso!");
+
+      // reset
+      setFile(null);
+      setIfcFile(null);
+      setPreview(null);
+      setColunaId("");
+      setLocalObra("");
+    } catch (err) {
+      console.error("[UPLOAD] Erro geral:", err);
+      setError("Erro inesperado. Veja o console.");
+    } finally {
+      setLoadingAnalysis(false);
+      console.log("[UPLOAD] Finalizado.");
+    }
   };
 
+  // ============ JSX ============
   return (
     <div className="bg-gray-800 p-6 rounded-2xl shadow-md text-white">
-      <h2 className="text-xl font-semibold mb-4">📤 Enviar imagem</h2>
+      <h2 className="text-xl font-semibold mb-4">📤 Enviar imagem + IFC</h2>
 
-      {/* Input de arquivo */}
-      <input
-        type="file"
-        accept="image/*"
-        onChange={handleFileChange}
-        className="mb-4"
-      />
+      {/* Imagem */}
+      <label className="block text-sm mb-1">Imagem:</label>
+      <input type="file" accept="image/*" onChange={handleFileChange} className="mb-4" />
 
-      {/* Preview */}
       {preview && (
         <div className="mb-4">
           <img
@@ -98,27 +158,41 @@ export default function ImageUploader() {
         </div>
       )}
 
-      {/* Barra de progresso */}
-      {progress > 0 && (
-        <div className="w-full bg-gray-700 rounded-full h-2 mb-4">
-          <div
-            className="bg-blue-600 h-2 rounded-full"
-            style={{ width: `${progress}%` }}
-          ></div>
-        </div>
-      )}
+      {/* IFC */}
+      <label className="block text-sm mb-1">Arquivo IFC:</label>
+      <input type="file" accept=".ifc" onChange={handleIfcChange} className="mb-4" />
+
+      {/* Campos extras */}
+      <label className="block mb-1">Identificador da coluna:</label>
+      <input
+        type="text"
+        value={colunaId}
+        onChange={(e) => setColunaId(e.target.value)}
+        placeholder="Ex: C-01"
+        className="w-full mb-3 p-2 rounded bg-gray-900 border border-gray-600"
+      />
+
+      <label className="block mb-1">Local da obra:</label>
+      <input
+        type="text"
+        value={localObra}
+        onChange={(e) => setLocalObra(e.target.value)}
+        placeholder="Ex: Plataforma Leste"
+        className="w-full mb-4 p-2 rounded bg-gray-900 border border-gray-600"
+      />
 
       {/* Mensagens */}
       {error && <p className="text-red-400 text-sm">{error}</p>}
       {success && <p className="text-green-400 text-sm">{success}</p>}
+      {loadingAnalysis && <p className="text-blue-300 text-sm">🔍 Processando...</p>}
 
       {/* Botão */}
       <button
         onClick={handleUpload}
-        disabled={!file || !user}
+        disabled={!file || !ifcFile || !user || loadingAnalysis}
         className="mt-4 w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition disabled:opacity-50"
       >
-        {file ? "Enviar imagem" : "Selecione um arquivo"}
+        {loadingAnalysis ? "Processando..." : "Enviar para análise"}
       </button>
     </div>
   );

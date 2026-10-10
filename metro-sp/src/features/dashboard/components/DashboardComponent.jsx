@@ -1,5 +1,6 @@
 "use client";
 
+import ReportsList from "@/features/reports/components/ReportsList";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase/config.js";
@@ -170,8 +171,9 @@ export default function DashboardComponent() {
           <div className="p-6 bg-gray-800 rounded-2xl shadow-md">
             <h2 className="text-xl font-semibold mb-4">📊 Relatórios</h2>
             <p className="text-gray-400">
-              Em breve: relatórios automáticos do andamento da obra.
+              Aqui você acompanha os relatórios gerados a partir da comparação entre imagem e IFC.
             </p>
+            <ReportsList />
           </div>
         )}
 

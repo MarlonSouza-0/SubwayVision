@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "@/firebase/config.js";
+import { auth } from "@/lib/firebase/config.js";
 import { useRouter } from "next/navigation";
 import { FaEnvelope } from "react-icons/fa";
 

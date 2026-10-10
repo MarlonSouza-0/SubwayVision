@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from io import BytesIO
 from PIL import Image
 import requests
+from pathlib import Path
 
 # ======== Fix PyTorch >= 2.6 weights_only ========
 import torch
@@ -44,13 +45,17 @@ from ultralytics import YOLO
 
 app = FastAPI()
 
-# 🚀 Nova rota raiz para evitar 404
+# 🚀 ROTA RAIZ
 @app.get("/")
 async def root():
     return {"status": "YOLO Service is running ✅"}
 
-# Carrega modelo YOLO
-model = YOLO("yolov8n.pt")
+# ======== 🔥 Caminho do modelo treinado ========
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "models" / "columns-best.pt"
+
+# Carrega modelo customizado
+model = YOLO(str(MODEL_PATH))
 
 class ImageRequest(BaseModel):
     imageUrl: str
@@ -64,6 +69,7 @@ async def analyze_image(data: ImageRequest):
 
         results = model(img)
         detections = []
+
         for r in results:
             names = getattr(model, "names", {})
             for box in r.boxes:
@@ -75,5 +81,6 @@ async def analyze_image(data: ImageRequest):
                 })
 
         return {"success": True, "detections": detections}
+
     except Exception as e:
         return {"success": False, "error": str(e)}
